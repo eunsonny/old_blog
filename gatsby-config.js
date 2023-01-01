@@ -39,10 +39,6 @@ module.exports = {
             name: `Github`,
             url: `https://github.com/eunsonny`,
           },
-          // {
-          //   name: `Homepage`,
-          //   url: `https://www.lekoarts.de?utm_source=minimal-blog&utm_medium=Starter`,
-          // },
         ],
       },
     },

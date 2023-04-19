@@ -1,97 +1,228 @@
 ---
-title: react-query
-date: 2023-03-26
+title: React-Query는 왜 그리고 어떻게 사용해야 할까?
+date: 2023-04-19
 draft: true
 tags:
-  - Router
+  - React-Query
 ---
 
-### Hash Router가 도대체 뭔데?
-회사의 어드민 프로젝트 중 하나가 Hash Router로 구성되어 있었는데, 해당 프로젝트를 다뤄야 하는 일이 생겼다. 도대체 이 프로젝트는 왜 Hash Router로 되어 있는거지? (…부끄러운 이야기이지만) 나는 이제까지의 React 프로젝트 대부분에서 Browser Router만을 사용했기 때문에 Hash Router에 대한 지식이 미미했다. 그래서 Browser Router와 Hash Router의 차이에 대해서 알아보기로 했다.
-<br />
+## 우리가 이제껏 서버 데이터를 다루는 방식은요… 🫢
 
-여러 자료들을 참고해보니 Hash Router와 Browser Router는 다음과 같은 특징을 갖고 있었다. 
-#### Browser Router
-* HTML5의 history API를 활용해서 UI 업데이트를 한다. (→ 새로고침 없이 URL 경로를 업데이트 할 수 있다)
-* 동적인 페이지에 적합하다. (서버에 있는 데이터들을 스크립트에 의해 가공 처리한 후 생성되어 전달되는 웹페이지)
-* 새로고침하면 경로를 찾지 못해서 에러가 난다. (주소를 사용하여 페이지를 찾아갈 때도 에러 발생)
-* 이를 해결하기 위해서는 `서버에 추가적인 세팅`이 필요하다. 페이지의 유무를 서버에 알려줘야 하며 서버 세팅시 검색엔진에 신경써야 한다. 
-* 배포가 좀 더 복잡하다.
+1. 서버로부터 데이터를 받아온다
+2. state에 값을 저장하고 해당 값을 이용해 화면을 렌더링 한다.
+3. 전역적으로 필요한 값의 경우에는 state가 아닌 전역상태관리(Ex. Redux, mobx, recoil 등)의 store에 저장하여 값을 다룬다.
+4. 필요에 따라 state(또는 store)에 담긴 상태 값을 업데이트 해 가면서 사용한다.
 
-#### Hash Router
-* URL의 hash를 활용한 라우터이다.
-* 주소에 #가 붙는다.
-* 정적인 페이지에 적합하다. (미리 저장된 페이지가 그대로 보여지는 웹페이지)
-* 검색엔진으로 읽지 못한다. 즉, SEO가 좋지 않다. (#값 때문에 서버가 읽지 못하고, 서버가 페이지의 유무를 알지 못하기 때문. 그 이유 때문에 거의 사용하지 않는다.)
-* URL의 해시부분은 서버에 전송되지 않으므로 브라우저에서만 사용된다. 
-* (Hash router를 사용하면 URL의 해시 부분과 일치하는 컴포넌트를 렌더링 하도록 설정할 수 있다)
-* 새로고침해도 에러가 일어나지 않는다. 
-<br />
+## 이제껏 이렇게 잘 써왔는데 무슨 문제가 있을까 🤔?
 
-음 그래그래... 대부분 끄덕끄덕 하면서 읽어 내려오는데, 몇 가지 특징에서 의문이 들기 시작했다.  **Browser Router를 사용하면 새로고침 시에 에러가 난다**고? 도대체 왜? 어째서? 그렇게 되는 것일까🤔??
+### 1. Single Source of Truth
 
-이제까지 내가 경험했던 React 기반 프로젝트 대부분에서는 react-router-dom의 browser router를 사용했으나 새로고침 시에 에러가 나는 현상을 만나지 못했는데... 내가 썼던 Browser Router는 무엇이었을까?
-… 그렇다면 나도 모르게 누군가가 추가적인 세팅을 해 주었던 것일까? (코드 우렁각시라도 있는 것일까 🥺?) 그 `추가적인 세팅`이란 과연 무엇일까? 
+> **For each unique piece of state, you will choose the component that “owns” it.** This principle is also known as having a [“single source of truth”.](https://en.wikipedia.org/wiki/Single_source_of_truth) It doesn’t mean that all state lives in one place—but that for *each* piece of state, there is a *specific* component that holds that piece of information. Instead of duplicating shared state between components, *lift it up* to their common shared parent, and *pass it down* to the children that need it.
+> 
 
-<br />
-### Browser Router를 사용하면 새로고침 시에 에러가 난다던데… 🤔
-우선 Browser Router 를 사용하면 왜 새로고침 시에 에러가 발생하는 지에 대해 근본적인 원인을 살펴보고자 했다.
+[https://react.dev/learn/sharing-state-between-components](https://react.dev/learn/sharing-state-between-components)
 
-과거 MPA(Multi page Application)으로 구현된 웹사이트의 경우, 경로를 이동하면 다음과 같은 동작을 하게 된다.
+리액트는 각 각의 상태값이 **단일한 정보의 원천(Single Source of Truth)**이 될 것을 권장한다. 그러나 이 원칙은 자칫 잘못하면 어그러지기 십상이다. 
 
-*  유저가 www.example.com/about 페이지로 이동을 한다.
-* 서버에 GET 요청을 보내 `about.html` 을 받아온다.
-* 브라우저는 `about.html` 이용해 화면을 그린다.
+구체적인 예를 들어보자 A 컴포넌트와 B 컴포넌트에서 동일하게 유저의 정보가 필요하다고 하자. 만약에 A와 B 컴포넌트에게 공통의 부모가 있다면 우리는 그 부모 컴포넌트에서 유저의 정보를 받아와 A와 B 컴포넌트에 props로 필요한 유저 정보를 내려줄 것이다. 그런데 만약 두 컴포넌트 사이 공통의 부모 컴포넌트가 없다면? 그리고 무지성으로 A와 B 컴포넌트 각 각 유저정보를 호출하여 각자의 state에 담아 사용한다면? 그 순간 Single Source of Truth의 원칙은 깨지고 만다. 이 상태에서 더 나아가 각 각의 컴포넌트에서 유저 정보를 다른 형태로 업데이트하여 사용한다면, 과연 어떤 데이터가 가장 최신화된 현재의 상태 값인지를 신뢰하기 힘들어지게 된다.
 
-즉, 이 시절에 `새로운 화면을 보여준다는 것은 = 새로운 html 파일을 받아온다`, 이며 이것은 곧 새로고침과 같은 효과(현상)가 나타나는이다. 새로운 페이지를 보기 위해서는 새로고침(과 같은 효과)가 일어나야만 했으며 새로운 html 페이지를 받아올 때까지 하얗게 날아간 화면을 봐야만 했다. 
+그래서 우리는 Single Source of Truth와 같은 원칙을 지키고, props drilling과 같은 불편함을 없애기 위해 전역상태관리 시스템을 사용하게 된다. 서버의 데이터를 받아와 store에 저장해 놓고 어떤 컴포넌트이던 store의 값을 참조하게 되면 store라는 단일한 정보의 원천을 바라보게 되는 것이다. 
 
-<br />
-그런데 JS가 점점 발전하면서 사람들은 SPA(Single Page Application)를 하게 된다. SPA는 html은 한번만 받아오고 나머지 화면을 전부 JS로 그리는 형태이다. 따라서 SPA / CSR 상황에서 페이지 이동(라우팅)이 일어날 때는 다음과 같이 동작한다.
+**아니 그런데 잠깐! 이것으로 진짜 Single Source of Truth의 원칙이 지켜졌다고 볼 수 있을까?** 
 
-* 브라우저 경로를 변경하면 트리거 되는 기본 HTML GET 요청(ex. `/about`으로 이동하면 about.html을 서버에 요청하는 것)은 막되
-* 브라우저 주소는 변경된 상태를 유지하도록 한 다음
-* 변경을 감지하여 DOM API가 다른 페이지에 알맞은 화면을 그리도록 한다. 
+서버 데이터(Server state)가 서버를 떠나 클라이언트의 store(혹은 state)에 저장되는 순간 이 데이터는 원본이 아니라 서버 데이터의 복사본일 뿐이며 클라이언트의 상태 값으로 바뀌게 된다. 결국은 복사본이 되었다는 점에서 Store를 사용하는 방식도 진정한 단일한 정보의 원천이 맞는지에 대해 약간의 의문이 든다 🧐
 
-<br />
-그리고 잘 알다시피 React 는 SPA로 동작하는 대표 라이브러리이다. 
-* React(SPA / CSR)로 구현된 웹 사이트의 홈페이지에 접속하면 서버에 요청하여 index.html 파일을 받아온다. 이 때 index.html 의 body 부분은 비어있다. 
-* 브라우저는 HTML 파일에서 head 태그를 읽으며 추가로 필요한 자원(ex. index.js, index.css 등)을 서버로 다시 요청한다.
-* 버튼을 눌러 다른 페이지로 이동할 경우(ex. /about) 서버에 about.html이 아닌 about.js 파일을 요청해 받아온다. 그리고 기존에 받아 놓았던 index.html에 about.js로 새로운 페이지를 그린다. 
+### 2. 보일러 플레이트 코드
 
-앞서 말했듯이 about.html 을 받아오는 기본 동작을 막고, DOM API가 /about에 알맞는 화면을 그리게 된다. 즉 path 이동과 routing은 작동을 하지만 모든것이 클라이언트 사이드에서 이뤄지고 서버는 아무런 관계가 없다. CSR이 이뤄진 것이다. 
+또한 우리는 전역 상태관리 시스템에서 서버에서 가져온 비동기 데이터를 관리하기 위해 거대한 보일러 플레이트 코드를 작성해야 하기도 했다. 
 
-<br />
-해당 사이트를 사용하는 모든 유저가 무조건 홈페이지(`/`)로 처음 접속하여 버튼을 눌러서만 이동한다면, 전혀 문제 될 것이 없다. 모든 라우팅은 앞서 말한 CSR의 방식으로 동작할 것이기 때문이다. 하지만 유저가 항상 이렇게 행동할 것이라고 누구도 장담 할 수 없다. 누군가는 새로고침 버튼을 눌러 의도적인 새로고침을 유도할 것이고, 누군가는 홈페이지가 아닌 다른 페이지(ex. /about) 주소를 주소창에 직접 입력하여 바로 접근하고 싶어할 것이다.
+---
 
-<br />
-**그럼 유저가 홈페이지가 아닌 페이지에서 의도적으로 새로고침을 트리거하거나, 주소를 직접 쳐서 들어오게 되면 어떻게 될까?**
-* 클라이언트는 서버에 새롭게 파일을 요청하게 된다.
-* 이 때, 이미 URL은 react-router의 path로 얼룩져 있는 상태이기 때문에, 서버는 그것이 무엇을 반환해 달라는 말인지 알지 못한다. (새로고침을 하거나 해당 주소를 직접 치는 행위는 index.html을 받아오는 행위가 아니기 때문에…)
-* 따라서 서버는 404 not found 에러를 반환한다.
+## 그래서 React-Query는요!
 
-> 바로 이 포인트가 **Browser Router를 이용하면, 새로고침 시에 에러가 난다!** 는 것이다.
-<br />
+리액트 쿼리는 이러한 기존의 상태값 관리에서 나아가 새로운 관점을 주장한다.
 
-### 그렇다면 Browser Router에서 새로고침 시에 에러가 나는 현상을 해결하려면 어떻게 해야 할까?
+- global state는 client와 Server로 분류할 수 있고, 이 두 state는 다른 방식으로 다뤄져야 효율적인 앱을 만들 수 있다.
+- Server state: 서버에서 가져오는 데이터들도 하나의 상태이다!
+- Server-State과 Client-State의 구분
+    - Client State : 세션간 지속적이지 않는 데이터, 동기적, 클라이언트가 소유, 항상 최신 데이터로 업데이트(렌더링에 반영)
+        - ex) 리액트 컴포넌트의 state, 동기적으로 저장되는 redux store의 데이터
+    - Server State : 세션간 지속되는 데이터, 비동기적, 세션을 진행하는 클라이언트만 소유하는게 아니고 공유되는 데이터도 존재하며 여러 클라이언트에 의해 수정될 수 있음, 클라이언트에서는 서버 데이터의 스냅샷만을 사용하기 때문에 클라이언트에서 보이는 서버 데이터는 항상 최신임을 보장할 수 없음.
+        - ex) 리액트 앱에서는 비동기 요청으로 받아올 수 있는, 백엔드 DB에 저장되어있는 데이터
 
-이를 **해결하는 방법은 크게 2가지** 이다.
-1. 라우터를 Hash Router로 변경한다.
-2. 서버에서 404 페이지에 대해서 작업한다.
-<br />
-#### 1) Hash Router로 변경한다. 
-* hash router의 경우 URL이 `www.domain.com/#/path**` 과 같은 형태로 이루어지는데, URL의 해시 부분은 서버에 전송되지 않고 브라우저에서만 사용된다.
-* 따라서 서버는 해시값을 제외한 www.domain.com에한 요청만 받아 들이게 되므로 index.html을 반환한다.
-* 에러가 발생하지 않는다.
-* 클라이언트에서는 해시값을 이용해서 라우팅 한다. (클라이언트에서 해시값에 해당하는 페이지가 없을 경우 index.html 만이 노출된다. 빈페이지 같은 것..)
- 
-hash router에서 서버는 주소의 이동을 모르게 된다 → 즉 페이지 존재유무에 대해서 모른다, 이로 인한 효과로 검색 엔진이 읽지 못하게 된다.
+**이러한 관점을 따른다면 우리는 상태 값을 다음과 같은 형태로 나누어 볼 수 있겠다.**
 
-#### 2) 서버에서 404 페이지에 대한 작업을 한다. 
-`/`이외의 path로 서버에 요청할 때 무조건 서버가 무조건 index.html을 리턴하도록 설정해준다. 이 방법이 글 초반에 언급한 `서버의 추가적인 세팅`이다. 
+- Server state: 서버에서 받아오는 데이터
+- Client State
+    - local(UI) state: Input의 value, Checkbox의 선택 여부(checked), 모달을 숨겼다 보여주는 값 등 하나 또는 여러 개의 컴포넌트에서 다루는 상태 값
+    - Global State: 다수의 컴포넌트를 넘나들며 전역적으로 사용되는 상태 값. 전역상태관리의 Store에 담아 이용하는 값들이라고 볼 수 있겠다. ex.다크모드 여부, 고정된 Nav에서 보여져야 하는 상태 값, 로그인 여부 등
+    - URL State: URL에 포함된 상태 값. 쿼리 스트링, 쿼리 파라미터 값
 
-<br />
-### 생각해보니
+## Stale-While-Revalidate 전략
 
-회사의 어드민 서비스의 경우에는 사내에서만 사용하는 작은 서비스이기 때문에 굳이 서버를 따로 구축하지 않았다. nginx를 이용중이였기 때문에 새로 고침시의 에러를 막기 위해서 해시라우터를 사용한 것이였다. 또한 회사 내부의 어드민 서비스이기 때문에 SEO도 고려할 필요가 없었다. 브라우저 라우터와 해시 라우터의 근본적인 동작 원리를 알아보고 나니, 왜 어드민에 해시 라우터를 사용했는지 명쾌하게 이해되었다. 사실 이제서야 이런 부분에 대해서 이해하게 되었다는 것이 조금 부끄럽기도 하다. 
+즉 react query는 Server state를 Client state와 분리하여 다룰 수 있게 해주는 툴이며, 보다 효과적으로 Server state를 다루기 위해 `stale-while-revalidate` 전략(캐시 패러다임)을 사용하고 있다.
 
-정말 아쉽고 안타깝게도 나는 이제껏 AWS의 CloudFront나 EC2등을 사용해 직접 배포 세팅을 해본 적이 없었다. 만약 내가 한번이라도 이런 세팅을 한 경험이 있었다면 그 과정에서 라우터나 새로고침에러 등에 대해 진작에 고려해볼 계기가 되지 않았을까 하는 생각이 들었다. AWS를 이용한 배포를 해보지 못한게 항상 마음 속 퀘스트처럼 남아있었는데 (물론 AWS 이용한 배포만이 능사는 아니겠지만...) 꼭 근 시일내에 AWS를 이용한 배포를 경험해 보아야 겠다는 생각이 든다. 
+`stale-while-revalidate` 는 **1) 캐시된 응답이 오래될 수 있다고 가정하는 부분**과 **2) 그 캐시된 응답을 재검증하는 프로세스** 두 부분으로 나뉜다.
+
+```tsx
+// HTTP Response Cache-Control Header
+Cache-Control: max-age=1, stale-while-revalidate=59
+```
+
+- **1) Cache-Control Header의 max-age를 확인**
+    - 아직 만료되지 않았으면 → Do nothing
+- **2) 만료되었으면 stale-while-revalidate 값을 확인**
+    - stale-while-revalidate 값을 넘지 않았다면
+        - 일단 캐싱된 값을 반환
+        - 동시에 향후 사용을 위해 데이터를 요청하여 최신화
+    - 넘었다면
+        - 데이터를 새로 요청해서 최신화
+
+## 써보니 이런게 좋던데요😋?
+
+- react Query는 서버 상태를 관리하는 레이어 전체를 추상화 시켜 개발자가 관리하는 앱 내의 상태에서 서버 상태를 제외한 UI 상태 에만 집중하여 개발할 수 있도록 했다.
+- 특히 비동기 로직을 쉽게 다룰 수 있다. (과거 redux saga같이 장황한 것들을 이용할 필요 없음) 작은 보일러 플레이트 코드로 사용할 수 있다.
+
+## 중요한 기본사항들
+
+- Query들은 4개의 상태를 가지며, useQuery가 반환하는 객체의 프로퍼티로 어떤 상태인지 확인이 가능하다.
+    1. `fresh` : 새롭게 추가된 쿼리 인스턴스 → active 상태의 시작, 기본 staleTime이 0이기 때문에 아무것도 설정을 안해주면 호출이 끝나고 바로 stale 상태로 변한다. staleTime을 늘려줄 경우 fresh한 상태가 유지되는데, 이때는 쿼리가 다시 마운트되도 패칭이 발생하지 않고 기존의 fresh한 값을 반환한다.
+    2. `fetching` : 요청을 수행하는 중인 쿼리
+    3. `stale` : 인스턴스가 존재하지만 이미 패칭이 완료된 쿼리. 특정 쿼리가 stale된 상태에서 같은 쿼리 마운트를 시도한다면 캐싱된 데이터를 반환하면서 리패칭을 시도한다.
+    4. `inactive` : active 인스턴스가 하나도 없는 쿼리. inactive된 이후에도 cacheTime 동안 캐시된 데이터가 유지된다. cacheTime이 지나면 GC된다.
+- 어떻게 inactive가 되는가? : 렌더링간에 다시 호출되지 않고 언마운트되는 쿼리들은 inactive가 된다.
+- 다음의 경우에 리패칭이 일어난다
+    1. 런타임에 stale인 특정 쿼리 인스턴스가 다시 만들어졌을 때 (refetchOnMount 옵션으로 끄고 키는게 가능)
+    2. window가 다시 포커스가 되었을 때(refetchOnWindowFocus 옵션으로 끄고 키는게 가능)
+    3. 네트워크가 다시 연결 되었을 때(refetchOnReconnect 옵션으로 끄고 키는게 가능)
+    4. refetch interval이 있을때 : 요청 실패한 쿼리는 디폴트로 3번 더 백그라운드단에서 요청하며, retry, retryDelay 옵션으로 간격과 횟수를 커스텀 가능하다.
+    5. 개발자가 직접 Mutation 등의 작업 이후 queryClient.invalidateQueries 를 사용해 수동으로 쿼리를 무효화 하여 revalidate 했을 때
+
+## React-query의 라이프사이클
+
+1. 'a' 쿼리 인스턴스가 mount 됨
+2. 네트워크에서 데이터 fetching 하고 'a'라는 query key로 캐싱
+3. 받아온 데이터는 fresh 상태에서 staleTime (default 0) 이후 stale 상태로 변경
+4. 'a' 쿼리 인스턴스가 unmount 되고 쿼리의 상태 값이 inactive로 변경
+5. 캐시는 inactive 상태에서 cacheTime (default 5 mins) 만큼 유지되고 그 이후엔 가비지 컬렉팅
+6. 만일 cacheTime이 지나기 전에 'a' 쿼리 인스턴스가 새롭게 mount되면 refetching 되고 fresh한 값을 가져오는 동안 캐시된 데이터를 보여줌
+
+cf 1. 쿼리가 언마운트되거나 더 이상 사용하지 않을 때 ⇒ 마지막 인스턴스가 언마운트되어 inactive 상태가 되었을때 5분(cacheTime의 기본값)이 지나면 자동으로 삭제한다.
+
+cf 2. cacheTime은 stateTime과 관계없이 무조건 inactive된 시점을 기준으로 캐시 데이터 삭제.
+
+---
+
+## React -query를 좀 더 현명하게 사용하는 방법들
+
+### :: 쉽게 변하지 않는 값을 한번만 받아와서 재 사용하고 싶을 때
+
+행정구역 정보, 국가 리스트 등 거의 변하지 않는 정보들은 처음 한번만 호출한 뒤 캐싱하여 재활용 할 수 있다. 
+
+<aside>
+💡 staleTime: infinity, cacheTime: infinity로 설정한다.
+
+</aside>
+
+- staleTime을 inifinity로 설정하게 되면, 데이터를 한번 받아오면 항상 fresh한 것으로 간주된다. cacheTime (default. 5mins) 내에 인스턴스가 언마운트 되었다가 다시 마운트 되면 데이터는 fresh 상태이기 때문에 refetch 하지 않는다.
+- 그러나 인스턴스가 언마운트 되고(쿼리가 inactive 상태로 변한다.), cacheTime이 지나면 가비지 컬렉팅 되기 때문에, 이 이후에 다시 마운트되면 refetch 된다.
+- 따라서 런타임 내내 처음 한번만 받아와 계속 사용하고 싶다면, staleTime, cacheTime 모두 infinity로 설정하면 된다.
+- 쿼리 값은 계속 fresh한 상태이며, cacheTime이 infinity이기 때문에 GC되지 않는다.
+
+### :: Invalidation
+
+- useQuery를 이용해 `queryKey: [’user’]` 의 정보를 받아온다 -> user 정보가 캐싱된다.
+- 유저가 닉네임을 변경한다(mutation). -> mutate가 성공하면 유저 정보가 변경되면서 캐싱되어 있던  `queryKey: [’user’]` query의 상태가 stale 하게 변한다.
+- 이 경우, useQuery를 이용하여 `queryKey: [’user’]`를 리패칭하려고 시도할 수 있으나 그러지 말고,
+- invalidateQueries 메소드를 사용하여 개발자가 명시적으로 query가 stale되는 지점을 지정해 줄 수 있다. 해당 메소드가 호출되면 쿼리가 바로 stale되고, 리패치가 진행된다. Mutation 생명주기(onSuccess 옵션) 내에서 해주면 자연스럽다.
+
+```jsx
+import { useMutation, useQueryClient } from 'react-query';
+
+const queryClient = useQueryClient();
+
+// 뮤테이션이 성공한다면, 쿼리의 데이터를 invalidate해 관련된 쿼리가 리패치되도록 만든다.
+const mutation = useMutation(addTodo, {
+  onSuccess: () => {
+    queryClient.invalidateQueries('user');
+    queryClient.invalidateQueries('reminders');
+  },
+});
+```
+
+- 또한 mutation으로 요청 후 서버에서 받는 response값이 갱신된 새로운 데이터일 경우도 있다. 이럴때는 mutation을 성공했을 때 쿼리 데이터를 명시적으로 바꿔주는 queryClient 인스턴스의 setQueryData 메소드를 사용하면 좋다.
+
+```jsx
+const queryClient = useQueryClient();
+
+const mutation = useMutation(editTodo, {
+  onSuccess: (data) => queryClient.setQueryData(['todo', { id: 5 }], data),
+});
+
+mutation.mutate({
+  id: 5,
+  name: 'Do the laundry',
+});
+
+// 뮤테이션의 response 값으로 업데이트된 data를 사용할 수 있다.
+const { status, data, error } = useQuery(['todo', { id: 5 }], fetchTodoByID);
+```
+
+### :: initialData 활용하기
+
+initialData 옵션을 사용하면 **쿼리의 초기 데이터를 설정하고 초기 로딩 상태를 건너 뛸 수 있다**. initialData는 캐시에도 유지되기 때문에, 불완전한 데이터를 제공하지 않는 것이 좋다. 불완전한 데이터의 경우에는 initialData가 아닌 placeholderData 옵션을 이용하자!
+
+다른 쿼리의 캐시된 결과에서 쿼리의 초기 데이터를 제공할 수 있다. 예를 들어 할일 목록 쿼리에서 캐시된 데이터를 검색하여 개별 할일 항목을 찾은 다음 이를 개별 할일 쿼리의 초기 데이터로 사용하는 것을 좋은 예로 들 수 있다. 
+
+```jsx
+const result = useQuery({
+  queryKey: ['todo', todoId],
+  queryFn: () => fetch('/todos'),
+  initialData: () => {
+    // Use a todo from the 'todos' query as the initial data for this todo query
+    return queryClient.getQueryData(['todos'])?.find((d) => d.id === todoId)
+  },
+})
+```
+
+### :: 에러 핸들링
+
+- 전역 onError를 세팅해두면, 에러 발생시 전역 onError에서 Catch된다.
+- 그러나 개별의 쿼리(useMutation, useQuery)에서 onError를 세팅해두면 개별 onError 핸들러가 동작하고 해당 에러는 이미 잡혔으므로 상위 스코프로 전파되지 않아, 전역 onError 는 동작하지 않는다.
+
+cf. 그러나 useMutation과 mutate 함수에 onError/onSuccess 핸들러를 각 각 세팅할 경우 두 개의 핸들러는 모두 동작한다. (그 중 useMutation에 설정된 핸들러가 먼저 동작하는 듯…)
+
+### :: 쿼리 키를 의존성 배열로 생각하자
+
+그간 우리는 기본적으로 어떠한 비동기 호출을 명령형에 가까운 방식으로 처리해왔다. 그러나 react-query를 이용하면 `이 비동기 요청은 state가 x인 경우의 결과물이다` 는 식의 선언형으로 호출할 수 있게 된다. 만약 state의 값이 바뀐다면 쿼리 키 배열의 변화를 감지하여 자동으로 새로운 요청을 보낸다.
+
+```tsx
+const [state, setState] = useState()
+const [data, setData] = useState()
+
+useEffect(() => {
+	const res = fetchTodos(state)
+	setData(res)
+}, [state])
+```
+
+```tsx
+export const useTodosQuery = (state: State) =>
+  useQuery(['todos', state], () => fetchTodos(state))
+```
+
+이러한 컨셉을 이해한다면 아래와 같이 `refetch` 가 실행될 상황이나, 함수 인자로 특정 요청에 필요한 id를 넘기지 않게 될 것이다.
+
+```tsx
+// 잘못된 예시
+const { data, refetch } = useQuery(['item'], () => fetchItem({ id: 1 }))
+
+<button onClick={() => {
+  // 🚨 this is not how it works
+  refetch({ id: 2 })
+}})>Show Item 2</button>
+```
+
+데이터 요청이 state(`id`)에 의존하도록 수정하는 것이 맞다.
+
+**참고자료**

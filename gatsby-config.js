@@ -20,6 +20,7 @@ module.exports = {
   },
   trailingSlash: `never`,
   plugins: [
+    'gatsby-source-filesystem',
     {
       resolve: `@lekoarts/gatsby-theme-minimal-blog`,
       // See the theme's README for all available options
@@ -127,6 +128,12 @@ module.exports = {
         isTSX: true, // defaults to false
         jsxPragma: `jsx`, // defaults to "React"
         allExtensions: true, // defaults to false
+      },
+    },
+    {
+      resolve: 'gatsby-plugin-draft',
+      options: {
+        nodeType: 'Mdx',
       },
     },
     shouldAnalyseBundle && {

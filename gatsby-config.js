@@ -20,7 +20,6 @@ module.exports = {
   },
   trailingSlash: `never`,
   plugins: [
-    'gatsby-source-filesystem',
     {
       resolve: `@lekoarts/gatsby-theme-minimal-blog`,
       // See the theme's README for all available options

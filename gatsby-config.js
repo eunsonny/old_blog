@@ -129,12 +129,6 @@ module.exports = {
         allExtensions: true, // defaults to false
       },
     },
-    {
-      resolve: 'gatsby-plugin-draft',
-      options: {
-        nodeType: 'Mdx',
-      },
-    },
     shouldAnalyseBundle && {
       resolve: `gatsby-plugin-webpack-bundle-analyser-v2`,
       options: {
